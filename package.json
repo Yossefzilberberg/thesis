@@ -1,6 +1,6 @@
 {
   "name": "thesis-forge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "A full end-to-end English academic thesis writing system — research question refinement, literature review, methodology, data analysis, discussion, citations, defense simulation.",
   "scripts": {

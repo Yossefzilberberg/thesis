@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { APP_VERSION, BUILD_MESSAGE, BUILD_REF, SHORT_SHA, formatBuildTime, versionLabel } from "@/lib/version";
 
 type NavItem = { href: string; label: string; desc?: string };
 
@@ -21,6 +22,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <Link href="/" className="flex items-center gap-2 font-serif text-lg font-semibold text-ink-900">
             <span className="inline-block h-2 w-2 rounded-full bg-accent-500" />
             Thesis Forge
+            <span
+              className="ml-2 hidden rounded border border-ink-200 bg-ink-50 px-1.5 py-0.5 font-mono text-[10px] font-normal text-ink-600 sm:inline"
+              title={BUILD_MESSAGE || "Build version"}
+            >
+              v{APP_VERSION}
+              {SHORT_SHA ? ` · ${SHORT_SHA}` : ""}
+            </span>
           </Link>
           <nav className="flex items-center gap-1">
             {NAV.map((item) => (
@@ -42,7 +50,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
       </header>
       <main className="flex-1">{children}</main>
       <footer className="border-t border-ink-200 py-6 text-center text-xs text-ink-500">
-        A research advisor, not a ghost-writer. Your work, disciplined end-to-end.
+        <div>A research advisor, not a ghost-writer. Your work, disciplined end-to-end.</div>
+        <div
+          className="mt-1 font-mono text-[10px] text-ink-400"
+          title={BUILD_MESSAGE || "Build info"}
+        >
+          {versionLabel()}
+          {BUILD_REF && BUILD_REF !== "main" ? ` · ${BUILD_REF}` : ""}
+          {formatBuildTime() ? "" : " · dev"}
+        </div>
       </footer>
     </div>
   );
