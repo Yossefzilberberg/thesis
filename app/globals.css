@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f7f7f6;
+  --fg: #1a1713;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+/* Rich text editor styling — paper-like, so the drafts feel like a thesis. */
+.ProseMirror {
+  outline: none;
+  min-height: 60vh;
+  font-family: Georgia, "Cambria", "Times New Roman", serif;
+  font-size: 16px;
+  line-height: 1.7;
+  color: #1a1713;
+}
+.ProseMirror p {
+  margin: 0 0 1em 0;
+}
+.ProseMirror h1 {
+  font-size: 1.9rem;
+  font-weight: 700;
+  margin: 1.4em 0 0.6em;
+  letter-spacing: -0.01em;
+}
+.ProseMirror h2 {
+  font-size: 1.45rem;
+  font-weight: 700;
+  margin: 1.2em 0 0.5em;
+}
+.ProseMirror h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 1em 0 0.4em;
+}
+.ProseMirror blockquote {
+  border-left: 3px solid #b3ae9f;
+  padding-left: 1em;
+  margin: 1em 0;
+  color: #3f3a32;
+  font-style: italic;
+}
+.ProseMirror code {
+  background: #e9e8e4;
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+  font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.92em;
+}
+.ProseMirror pre {
+  background: #1a1713;
+  color: #f7f7f6;
+  padding: 1em;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+.ProseMirror table {
+  border-collapse: collapse;
+  margin: 1em 0;
+  width: 100%;
+}
+.ProseMirror th,
+.ProseMirror td {
+  border: 1px solid #d4d1c9;
+  padding: 0.5em 0.75em;
+}
+.ProseMirror th {
+  background: #f0eee8;
+  font-weight: 600;
+}
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-left: 1.5em;
+  margin: 0 0 1em 0;
+}
+.ProseMirror [data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+.ProseMirror [data-type="taskItem"] {
+  display: flex;
+  gap: 0.5em;
+}
+.ProseMirror mark {
+  background: #fef3a8;
+  padding: 0 0.15em;
+}
+.ProseMirror a {
+  color: #1349a3;
+  text-decoration: underline;
+}
+.ProseMirror .citation-chip {
+  background: #dbecff;
+  color: #143f82;
+  padding: 0.05em 0.4em;
+  border-radius: 4px;
+  font-family: -apple-system, sans-serif;
+  font-size: 0.9em;
+  border: 1px solid #b7d9ff;
+}
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #8c8676;
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #d4d1c9;
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #b3ae9f;
+}
