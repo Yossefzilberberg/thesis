@@ -1,9 +1,11 @@
-// Persistence layer. IndexedDB when running in the browser (via Dexie),
-// with a localStorage fallback so the app still works in SSR-only contexts
-// or privacy-mode browsers that block IndexedDB.
+// Persistence layer. When Supabase is configured and the user is signed
+// in, the cloud is the source of truth. Otherwise, we fall back to
+// IndexedDB (Dexie) with localStorage as a last resort so the app still
+// works in local dev and privacy-mode browsers.
 
 import Dexie, { type Table } from "dexie";
 import type { Thesis } from "./types";
+import { getSupabaseBrowser, isSupabaseConfigured } from "./supabase/client";
 
 class ThesisDB extends Dexie {
   theses!: Table<Thesis, string>;
@@ -39,7 +41,83 @@ function writeLS(items: Thesis[]) {
   window.localStorage.setItem(LS_KEY, JSON.stringify(items));
 }
 
+// ---------------- Supabase helpers ----------------
+
+type CloudRow = {
+  id: string;
+  user_id: string;
+  title: string;
+  data: Thesis;
+  updated_at: string;
+  created_at: string;
+};
+
+async function supabaseSession() {
+  if (!isSupabaseConfigured()) return null;
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return null;
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) return null;
+  return { supabase, userId: data.user.id };
+}
+
+async function cloudList(): Promise<Thesis[] | null> {
+  const s = await supabaseSession();
+  if (!s) return null;
+  const { data, error } = await s.supabase
+    .from("theses")
+    .select("data, updated_at")
+    .order("updated_at", { ascending: false });
+  if (error) {
+    console.error("Supabase list failed:", error.message);
+    return null;
+  }
+  return (data ?? []).map((r: { data: Thesis }) => r.data);
+}
+
+async function cloudGet(id: string): Promise<Thesis | null> {
+  const s = await supabaseSession();
+  if (!s) return null;
+  const { data, error } = await s.supabase.from("theses").select("data").eq("id", id).maybeSingle();
+  if (error || !data) return null;
+  return (data as { data: Thesis }).data;
+}
+
+async function cloudUpsert(thesis: Thesis): Promise<boolean> {
+  const s = await supabaseSession();
+  if (!s) return false;
+  const row = {
+    id: thesis.id,
+    user_id: s.userId,
+    title: thesis.title || "Untitled Thesis",
+    data: thesis,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await s.supabase.from("theses").upsert(row, { onConflict: "id" });
+  if (error) {
+    console.error("Supabase upsert failed:", error.message);
+    return false;
+  }
+  return true;
+}
+
+async function cloudDelete(id: string): Promise<boolean> {
+  const s = await supabaseSession();
+  if (!s) return false;
+  const { error } = await s.supabase.from("theses").delete().eq("id", id);
+  if (error) {
+    console.error("Supabase delete failed:", error.message);
+    return false;
+  }
+  return true;
+}
+
+// ---------------- Public API ----------------
+
 export async function listTheses(): Promise<Thesis[]> {
+  const cloud = await cloudList();
+  if (cloud) return cloud;
+
   const d = getDb();
   if (!d) return readLS();
   try {
@@ -58,6 +136,9 @@ export async function listTheses(): Promise<Thesis[]> {
 }
 
 export async function getThesis(id: string): Promise<Thesis | undefined> {
+  const cloud = await cloudGet(id);
+  if (cloud) return cloud;
+
   const d = getDb();
   if (!d) return readLS().find((t) => t.id === id);
   try {
@@ -69,6 +150,11 @@ export async function getThesis(id: string): Promise<Thesis | undefined> {
 
 export async function saveThesis(thesis: Thesis): Promise<void> {
   const updated = { ...thesis, updatedAt: new Date().toISOString() };
+
+  // Try cloud first. If that succeeds, we still write to IndexedDB for
+  // offline reads and quick navigation.
+  const cloudOk = await cloudUpsert(updated);
+
   const d = getDb();
   if (d) {
     try {
@@ -80,9 +166,16 @@ export async function saveThesis(thesis: Thesis): Promise<void> {
   const all = readLS();
   const next = [updated, ...all.filter((t) => t.id !== updated.id)];
   writeLS(next);
+
+  if (!cloudOk && isSupabaseConfigured()) {
+    // Surface a soft warning but don't throw — local save already happened.
+    console.warn("Thesis saved locally; cloud sync failed (check connection / auth).");
+  }
 }
 
 export async function deleteThesis(id: string): Promise<void> {
+  await cloudDelete(id);
+
   const d = getDb();
   if (d) {
     try {
@@ -105,4 +198,46 @@ export async function importThesis(json: string): Promise<Thesis> {
   if (!parsed.id || !parsed.chapters) throw new Error("Invalid thesis file");
   await saveThesis(parsed);
   return parsed;
+}
+
+// ---------------- Migration helpers ----------------
+
+// Pull every local thesis and push it to the cloud. Useful the first
+// time a user signs in after the cloud upgrade. Returns the number of
+// theses uploaded.
+export async function migrateLocalToCloud(): Promise<number> {
+  const s = await supabaseSession();
+  if (!s) return 0;
+  const local: Thesis[] = [];
+  const d = getDb();
+  if (d) {
+    try {
+      local.push(...(await d.theses.toArray()));
+    } catch {
+      /* ignore */
+    }
+  }
+  for (const t of readLS()) {
+    if (!local.some((x) => x.id === t.id)) local.push(t);
+  }
+  let uploaded = 0;
+  for (const thesis of local) {
+    const ok = await cloudUpsert(thesis);
+    if (ok) uploaded += 1;
+  }
+  return uploaded;
+}
+
+export async function countLocalTheses(): Promise<number> {
+  let n = 0;
+  const d = getDb();
+  if (d) {
+    try {
+      n = await d.theses.count();
+    } catch {
+      /* ignore */
+    }
+  }
+  if (!n) n = readLS().length;
+  return n;
 }

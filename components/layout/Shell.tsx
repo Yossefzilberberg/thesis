@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { cn } from "@/lib/utils";
 import { APP_VERSION, BUILD_MESSAGE, BUILD_REF, SHORT_SHA, formatBuildTime, versionLabel } from "@/lib/version";
 
@@ -15,6 +16,7 @@ const NAV: NavItem[] = [
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { user, configured, signOut } = useAuth();
   return (
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-ink-200 bg-white/80 backdrop-blur">
@@ -45,6 +47,30 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 {item.label}
               </Link>
             ))}
+            {configured && (
+              <div className="ml-2 flex items-center gap-1 border-l border-ink-200 pl-2">
+                {user ? (
+                  <>
+                    <span className="hidden text-xs text-ink-500 sm:inline" title={user.email ?? ""}>
+                      {user.email}
+                    </span>
+                    <button
+                      onClick={() => void signOut()}
+                      className="rounded-md px-3 py-1.5 text-sm text-ink-600 hover:bg-ink-50 hover:text-ink-900"
+                    >
+                      Sign out
+                    </button>
+                  </>
+                ) : (
+                  <Link
+                    href="/auth/login"
+                    className="rounded-md bg-ink-900 px-3 py-1.5 text-sm text-white hover:bg-ink-800"
+                  >
+                    Sign in
+                  </Link>
+                )}
+              </div>
+            )}
           </nav>
         </div>
       </header>

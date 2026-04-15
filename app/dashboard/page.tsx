@@ -1,19 +1,44 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { Shell } from "@/components/layout/Shell";
 import { Badge, Button, Card } from "@/components/ui/primitives";
 import { useThesisStore } from "@/lib/store";
-import { deleteThesis } from "@/lib/storage";
+import { countLocalTheses, deleteThesis, migrateLocalToCloud } from "@/lib/storage";
 import { formatDate, truncate } from "@/lib/utils";
 
 export default function DashboardPage() {
   const { thesesIndex, refreshIndex, isHydrated } = useThesisStore();
+  const { user, configured } = useAuth();
+  const [localCount, setLocalCount] = useState(0);
+  const [migrating, setMigrating] = useState(false);
+  const [migrateMessage, setMigrateMessage] = useState<string | null>(null);
 
   useEffect(() => {
     void refreshIndex();
-  }, [refreshIndex]);
+    if (configured && user) {
+      void countLocalTheses().then(setLocalCount);
+    }
+  }, [refreshIndex, configured, user]);
+
+  async function runMigration() {
+    setMigrating(true);
+    setMigrateMessage(null);
+    try {
+      const n = await migrateLocalToCloud();
+      setMigrateMessage(
+        n === 0
+          ? "No local theses were found to upload."
+          : `Uploaded ${n} thesis${n === 1 ? "" : "es"} to the cloud.`,
+      );
+      setLocalCount(0);
+      await refreshIndex();
+    } finally {
+      setMigrating(false);
+    }
+  }
 
   return (
     <Shell>
@@ -29,6 +54,22 @@ export default function DashboardPage() {
             <Button>+ New thesis</Button>
           </Link>
         </div>
+
+        {configured && user && localCount > 0 && (
+          <Card className="mb-6 border-accent-200 bg-accent-50">
+            <div className="flex items-center justify-between gap-4">
+              <div className="text-sm text-ink-800">
+                <b>{localCount}</b> thesis{localCount === 1 ? "" : "es"} found in this browser&apos;s
+                local storage. Upload them to your cloud account so they sync
+                across devices and survive redeploys.
+              </div>
+              <Button onClick={runMigration} disabled={migrating}>
+                {migrating ? "Uploading…" : "Upload to cloud"}
+              </Button>
+            </div>
+            {migrateMessage && <p className="mt-2 text-xs text-ink-600">{migrateMessage}</p>}
+          </Card>
+        )}
 
         {!isHydrated ? (
           <p className="text-sm text-ink-500">Loading…</p>
